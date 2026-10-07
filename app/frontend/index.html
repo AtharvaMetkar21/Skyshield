@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SKYSHIELD — C-UAS Multi-Modal Defense System</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&family=Orbitron:wght@500;700;900&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+</head>
+<body class="theme-dark">
+    <!-- Header / Defense Perimeter Status Bar -->
+    <header class="hud-header">
+        <div class="logo-group">
+            <div class="radar-pulse-icon"></div>
+            <div>
+                <h1 class="system-title">SKYSHIELD <span class="tag-version">C-UAS DEFENSE v5.0</span></h1>
+                <p class="system-subtitle">RADAR MICRO-DOPPLER & ELECTRO-OPTICAL MULTI-SENSOR RECOGNITION</p>
+            </div>
+        </div>
+
+        <div class="header-controls">
+            <div class="perimeter-badge" id="perimeterStatusBadge">
+                <span class="status-dot"></span>
+                <span id="perimeterStatusText">PERIMETER ARMED</span>
+            </div>
+            <button id="armAudioBtn" class="btn btn-warning pulse-btn">🔊 ARM AUDIO SYSTEM</button>
+            <button id="ackAlarmBtn" class="btn btn-danger hidden">SILENCE ALARM</button>
+        </div>
+    </header>
+
+    <!-- Main Tactical Grid -->
+    <main class="tactical-layout">
+        <!-- Left: Radar PPI Display Canvas -->
+        <section class="panel radar-panel">
+            <div class="panel-header">
+                <h2>TACTICAL AIRSPACE PPI RADAR</h2>
+                <span class="bearing-readout" id="sweepBearing">AZIMUTH: 000°</span>
+            </div>
+            
+            <div class="radar-viewport">
+                <canvas id="radarCanvas" width="560" height="560"></canvas>
+                <div class="radar-overlay-stats">
+                    <div class="stat-item"><span class="lbl">SWEEP RANGE:</span> <span class="val">25.0 KM</span></div>
+                    <div class="stat-item"><span class="lbl">SENSITIVITY:</span> <span class="val">RECALL-FIRST</span></div>
+                    <div class="stat-item"><span class="lbl">ACTIVE TRACKS:</span> <span class="val" id="trackCount">0</span></div>
+                </div>
+            </div>
+
+            <!-- Operational Mode Toggle -->
+            <div class="mode-selector-group">
+                <label class="mode-label">OPERATING MODE:</label>
+                <div class="mode-buttons">
+                    <button class="btn btn-mode active" id="modeVisionBtn" data-mode="vision">VISION-ONLY SENSOR</button>
+                    <button class="btn btn-mode" id="modeFusionBtn" data-mode="fusion">SIMULATED SENSOR FUSION</button>
+                </div>
+            </div>
+        </section>
+
+        <!-- Right: Target Ingestion & Analysis Display -->
+        <section class="panel analysis-panel">
+            <div class="panel-header">
+                <h2>TARGET RECOGNITION & TELEMETRY</h2>
+                <span class="threat-level" id="threatLevelTag">STATUS: STANDBY</span>
+            </div>
+
+            <!-- Ingestion Tabs / File Upload -->
+            <div class="ingest-card">
+                <div class="upload-area" id="dropArea">
+                    <input type="file" id="fileInput" accept="image/*" class="file-input-hidden">
+                    <div class="upload-prompt">
+                        <div class="upload-icon">⤓</div>
+                        <p><strong>DROP AERIAL SENSOR FRAME</strong> or <span class="link-span">browse local files</span></p>
+                        <span class="upload-hint">Supports JPEG / PNG optical aerial images (D1 / D3)</span>
+                    </div>
+                </div>
+
+                <div class="url-input-group">
+                    <input type="text" id="urlInput" placeholder="Enter secure aerial camera stream URL (HTTP/HTTPS)..." class="hud-input">
+                    <button id="urlSubmitBtn" class="btn btn-secondary">FETCH FRAME</button>
+                </div>
+
+                <!-- Fusion Scenario Picker (Shown in Fusion Mode) -->
+                <div class="fusion-scenario-box hidden" id="fusionScenarioBox">
+                    <label class="scenario-label">PAIRED RADAR DOPPLER SCENARIO:</label>
+                    <div class="scenario-toggles">
+                        <label><input type="radio" name="radarScenario" value="drone" checked> Drone Micro-Doppler</label>
+                        <label><input type="radio" name="radarScenario" value="bird"> Bird Wing-Flap</label>
+                        <label><input type="radio" name="radarScenario" value="other"> Aircraft / Helicopter</label>
+                    </div>
+                    <span class="scenario-note">Note: Evaluated against strictly held-out D2 test samples (simulated pairing).</span>
+                </div>
+            </div>
+
+            <!-- Classification & Threat Verdict Card -->
+            <div class="verdict-card" id="verdictCard">
+                <div class="verdict-banner" id="verdictBanner">
+                    <div class="verdict-title-group">
+                        <span class="verdict-label-sub">CLASSIFICATION VERDICT</span>
+                        <h3 class="verdict-class" id="verdictClass">AWAITING TARGET</h3>
+                    </div>
+                    <div class="verdict-badge-box">
+                        <span class="verdict-badge" id="verdictBadge">STANDBY</span>
+                    </div>
+                </div>
+
+                <!-- Probability Breakdown Bars -->
+                <div class="probability-section">
+                    <div class="prob-row">
+                        <div class="prob-label"><span>HOSTILE DRONE (C-UAS ALERT)</span><span id="probDroneVal" class="prob-val">0.0%</span></div>
+                        <div class="prob-bar-track"><div class="prob-bar-fill drone-bar" id="barDrone" style="width: 0%"></div></div>
+                    </div>
+                    <div class="prob-row">
+                        <div class="prob-label"><span>AVIAN (BIRD)</span><span id="probBirdVal" class="prob-val">0.0%</span></div>
+                        <div class="prob-bar-track"><div class="prob-bar-fill bird-bar" id="barBird" style="width: 0%"></div></div>
+                    </div>
+                    <div class="prob-row">
+                        <div class="prob-label"><span>OTHER AERIAL (AIRCRAFT / HELI)</span><span id="probOtherVal" class="prob-val">0.0%</span></div>
+                        <div class="prob-bar-track"><div class="prob-bar-fill other-bar" id="barOther" style="width: 0%"></div></div>
+                    </div>
+                </div>
+
+                <!-- Sensor Telemetry Details -->
+                <div class="telemetry-grid">
+                    <div class="telem-box">
+                        <span class="t-lbl">CONFIDENCE</span>
+                        <span class="t-val" id="telemetryConf">--</span>
+                    </div>
+                    <div class="telem-box">
+                        <span class="t-lbl">INFERENCE SPEED</span>
+                        <span class="t-val" id="telemetryLatency">-- ms</span>
+                    </div>
+                    <div class="telem-box">
+                        <span class="t-lbl">RECALL OVERRIDE</span>
+                        <span class="t-val" id="telemetryOverride">INACTIVE</span>
+                    </div>
+                    <div class="telem-box">
+                        <span class="t-lbl">CALIBRATION (T)</span>
+                        <span class="t-val" id="telemetryTemp">1.15</span>
+                    </div>
+                </div>
+
+                <!-- Grad-CAM Visual Explainability Overlay Toggle -->
+                <div class="explainability-box" id="explainBox">
+                    <div class="explain-header">
+                        <span>GRAD-CAM AIRFRAME ATTRIBUTION</span>
+                        <button id="toggleCamBtn" class="btn btn-sm btn-ghost">VIEW HEATMAP</button>
+                    </div>
+                    <div class="cam-preview-container hidden" id="camContainer">
+                        <div class="cam-images">
+                            <div class="cam-col">
+                                <span>Target Frame</span>
+                                <img id="targetImgPreview" src="" alt="Target Frame">
+                            </div>
+                            <div class="cam-col">
+                                <span>Grad-CAM Activation</span>
+                                <img id="camImgPreview" src="" alt="Grad-CAM Heatmap">
+                            </div>
+                        </div>
+                        <p class="cam-caption">Red regions highlight rotor/wing features influencing the convolutional decision.</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <!-- Bottom Tactical Event Log Table -->
+    <footer class="tactical-log-panel">
+        <div class="log-header">
+            <h3>REAL-TIME AIR DEFENSE INCIDENT LOG</h3>
+            <div class="log-actions">
+                <button id="exportCsvBtn" class="btn btn-sm btn-secondary">EXPORT INCIDENT LOG (CSV)</button>
+                <button id="clearLogBtn" class="btn btn-sm btn-ghost">CLEAR</button>
+            </div>
+        </div>
+        <div class="log-table-wrapper">
+            <table class="hud-table" id="incidentTable">
+                <thead>
+                    <tr>
+                        <th>TIMESTAMP</th>
+                        <th>TARGET ID</th>
+                        <th>MODE</th>
+                        <th>VERDICT</th>
+                        <th>CONFIDENCE</th>
+                        <th>ALERT LEVEL</th>
+                        <th>LATENCY</th>
+                        <th>ACTION</th>
+                    </tr>
+                </thead>
+                <tbody id="incidentLogBody">
+                    <tr><td colspan="8" class="text-center">No airspace incidents recorded. System active.</td></tr>
+                </tbody>
+            </table>
+        </div>
+    </footer>
+
+    <script src="app.js"></script>
+</body>
+</html>
