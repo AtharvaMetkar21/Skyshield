@@ -1,0 +1,41 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+*.pyc
+
+# Jupyter Notebook checkpoints
+.ipynb_checkpoints/
+*/.ipynb_checkpoints/*
+
+# Large raw datasets — keep out of git
+data/raw/
+data/interim/
+data/google_test_samples/
+
+# Non-production large CNN weights (>15MB)
+models_store/cnn_inception_v3.pt
+models_store/cnn_efficientnet_b0.pt
+
+# Environment files
+.env
+*.env
+venv/
+env/
+.venv/
+
+# IDE / OS
+.vscode/
+.idea/
+*.DS_Store
+Thumbs.db
+desktop.ini
+
+# Logs
+*.log
+logs/
+
+# Distribution / packaging
+dist/
+build/
+*.egg-info/

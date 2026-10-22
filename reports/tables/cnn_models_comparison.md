@@ -1,0 +1,5 @@
+| Model             | Val_Accuracy   |   Val_Macro_F1 | Val_Drone_Recall   | Train_Val_Gap   | Total_Params   | Disk_Size_MB   | CPU_Latency_ms   | Train_Time_s   |
+|:------------------|:---------------|---------------:|:-------------------|:----------------|:---------------|:---------------|:-----------------|:---------------|
+| MobileNetV3-Small | 89.87%         |         0.8991 | 88.35%             | 2.00%           | 2.54M          | 3.9 MB         | 7.4 ms           | N/A            |
+| EfficientNet-B0   | 91.05%         |         0.9107 | 91.60%             | 2.00%           | 5.29M          | 16.2 MB        | 29.5 ms          | N/A            |
+| InceptionV3       | 86.62%         |         0.8646 | 96.21%             | 2.00%           | 27.16M         | 97.1 MB        | 73.2 ms          | N/A            |

@@ -1,0 +1,13 @@
+.git
+.venv
+__pycache__
+*.pyc
+*.pyo
+*.pyd
+.ipynb_checkpoints
+data/raw/
+data/interim/
+data/google_test_samples/
+notebooks/
+scratch/
+tests/
