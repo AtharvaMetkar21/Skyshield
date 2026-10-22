@@ -1,0 +1,321 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SKYSHIELD — C-UAS Multi-Modal Defense System</title>
+    <meta name="description" content="SkyShield Counter-UAS defense system with multi-modal radar and vision classification for airborne threat detection.">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Orbitron:wght@400;500;700;900&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+
+    <!-- ============================================ -->
+    <!-- TOP STATUS BAR                               -->
+    <!-- ============================================ -->
+    <header id="headerBar" class="header-bar">
+        <div class="header-left">
+            <div class="logo-pulse"></div>
+            <div class="logo-text">
+                <h1>SKYSHIELD <span class="version-tag">C-UAS v5.0</span></h1>
+                <p class="subtitle">RADAR MICRO-DOPPLER · ELECTRO-OPTICAL VISION · MULTI-SENSOR FUSION</p>
+            </div>
+        </div>
+        <div class="header-right">
+            <div class="status-badge" id="systemBadge">
+                <span class="status-dot green"></span>
+                <span id="systemStatusText">PERIMETER ARMED</span>
+            </div>
+            <button id="armAudioBtn" class="btn btn-amber pulse-glow">🔊 ARM AUDIO</button>
+            <button id="muteBtn" class="btn btn-ghost hidden">🔇 MUTE</button>
+            <button id="ackAlarmBtn" class="btn btn-red hidden">SILENCE ALARM</button>
+        </div>
+    </header>
+
+    <!-- ============================================ -->
+    <!-- MAIN TACTICAL GRID                           -->
+    <!-- ============================================ -->
+    <main class="main-grid">
+
+        <!-- ========== LEFT COLUMN: RADAR ========== -->
+        <section class="panel radar-section">
+            <div class="panel-title-bar">
+                <h2>TACTICAL AIRSPACE PPI RADAR</h2>
+                <span class="mono-readout" id="sweepAzimuth">AZ: 000°</span>
+            </div>
+
+            <!-- Radar Canvas -->
+            <div class="radar-container">
+                <canvas id="radarCanvas" width="600" height="600"></canvas>
+                <div class="radar-hud-overlay">
+                    <div><span class="lbl">RANGE:</span> <span class="val">25.0 KM</span></div>
+                    <div><span class="lbl">MODE:</span> <span class="val" id="radarModeDisplay">SEARCH</span></div>
+                    <div><span class="lbl">TRACKS:</span> <span class="val" id="trackCountDisplay">0</span></div>
+                </div>
+            </div>
+
+            <!-- Mode Selector -->
+            <div class="mode-row">
+                <span class="mode-label">OPERATING MODE:</span>
+                <div class="mode-btns">
+                    <button class="btn btn-mode" id="btnModeVision" data-mode="vision">VISION ONLY</button>
+                    <button class="btn btn-mode active" id="btnModeFusion" data-mode="fusion">SENSOR FUSION</button>
+                </div>
+            </div>
+        </section>
+
+        <!-- ========== RIGHT COLUMN: ANALYSIS ========== -->
+        <section class="panel analysis-section">
+            <div class="panel-title-bar">
+                <h2>TARGET RECOGNITION & TELEMETRY</h2>
+                <span class="threat-tag" id="threatTag">STANDBY</span>
+            </div>
+
+            <!-- Upload Area -->
+            <div class="upload-card" id="uploadCard">
+                <div class="drop-zone" id="dropZone">
+                    <input type="file" id="fileInput" accept="image/*" class="file-hidden">
+                    <div class="drop-icon">📡</div>
+                    <p><strong>DROP AERIAL IMAGE</strong> or <span class="link-text">browse files</span></p>
+                    <span class="hint-text">Supports JPEG / PNG optical aerial images (Google / Benchmark)</span>
+                </div>
+                <div class="url-row">
+                    <input type="text" id="urlInput" placeholder="Paste image URL (https://...)..." class="input-field">
+                    <button id="urlFetchBtn" class="btn btn-outline">FETCH</button>
+                </div>
+                <!-- Fusion scenario picker -->
+                <div class="fusion-options" id="fusionOptions">
+                    <span class="scenario-lbl">RADAR DOPPLER CORRELATION:</span>
+                    <div class="radio-group">
+                        <label><input type="radio" name="radarScenario" value="auto" checked> ⚡ Auto (Notebook 05 Tracking)</label>
+                        <label><input type="radio" name="radarScenario" value="drone"> Force Drone Radar (Adversarial)</label>
+                        <label><input type="radio" name="radarScenario" value="bird"> Force Bird Radar</label>
+                        <label><input type="radio" name="radarScenario" value="other"> Force Aircraft Radar</label>
+                    </div>
+                    <span class="note-text">Auto mode synchronizes micro-Doppler radar telemetry with the detected target (Notebook 05).</span>
+                </div>
+            </div>
+
+            <!-- Image Preview (shown after upload) -->
+            <div class="preview-strip hidden" id="previewStrip">
+                <img id="previewImg" src="" alt="Uploaded target">
+                <div class="preview-info">
+                    <span class="preview-label">TARGET FRAME</span>
+                    <span class="preview-status" id="previewStatus">PROCESSING...</span>
+                </div>
+            </div>
+
+            <!-- Loading State -->
+            <div class="analyzing-state hidden" id="analyzingState">
+                <div class="scan-bar"></div>
+                <span>ANALYZING TARGET SIGNATURE...</span>
+            </div>
+
+            <!-- ========== VERDICT CARD ========== -->
+            <div class="verdict-card hidden" id="verdictCard">
+
+                <!-- Classification Banner -->
+                <div class="verdict-banner" id="verdictBanner">
+                    <div>
+                        <span class="verdict-sub">CLASSIFICATION VERDICT</span>
+                        <h3 class="verdict-class" id="verdictClass">—</h3>
+                    </div>
+                    <span class="verdict-badge" id="verdictBadge">—</span>
+                </div>
+
+                <!-- 3 Model Results -->
+                <div class="models-grid">
+                    <!-- CNN Model -->
+                    <div class="model-card" id="cnnCard">
+                        <div class="model-header">
+                            <span class="model-icon">🧠</span>
+                            <div>
+                                <span class="model-name">CNN MODEL</span>
+                                <span class="model-arch">MobileNetV3-Small</span>
+                            </div>
+                        </div>
+                        <div class="prob-bars" id="cnnBars">
+                            <div class="prob-item">
+                                <div class="prob-top"><span>BIRD</span><span class="prob-pct" id="cnnBird">0%</span></div>
+                                <div class="bar-track"><div class="bar-fill bird" id="cnnBirdBar"></div></div>
+                            </div>
+                            <div class="prob-item">
+                                <div class="prob-top"><span>DRONE</span><span class="prob-pct" id="cnnDrone">0%</span></div>
+                                <div class="bar-track"><div class="bar-fill drone" id="cnnDroneBar"></div></div>
+                            </div>
+                            <div class="prob-item">
+                                <div class="prob-top"><span>OTHER</span><span class="prob-pct" id="cnnOther">0%</span></div>
+                                <div class="bar-track"><div class="bar-fill other" id="cnnOtherBar"></div></div>
+                            </div>
+                        </div>
+                        <div class="model-verdict" id="cnnVerdict">—</div>
+                    </div>
+
+                    <!-- Radar Model -->
+                    <div class="model-card" id="radarCard">
+                        <div class="model-header">
+                            <span class="model-icon">📡</span>
+                            <div>
+                                <span class="model-name">RADAR MODEL</span>
+                                <span class="model-arch">Random Forest (Micro-Doppler)</span>
+                            </div>
+                        </div>
+                        <div class="prob-bars" id="radarBars">
+                            <div class="prob-item">
+                                <div class="prob-top"><span>BIRD</span><span class="prob-pct" id="radarBird">0%</span></div>
+                                <div class="bar-track"><div class="bar-fill bird" id="radarBirdBar"></div></div>
+                            </div>
+                            <div class="prob-item">
+                                <div class="prob-top"><span>DRONE</span><span class="prob-pct" id="radarDrone">0%</span></div>
+                                <div class="bar-track"><div class="bar-fill drone" id="radarDroneBar"></div></div>
+                            </div>
+                            <div class="prob-item">
+                                <div class="prob-top"><span>OTHER</span><span class="prob-pct" id="radarOther">0%</span></div>
+                                <div class="bar-track"><div class="bar-fill other" id="radarOtherBar"></div></div>
+                            </div>
+                        </div>
+                        <div class="model-verdict" id="radarVerdict">—</div>
+                    </div>
+
+                    <!-- Combined Fusion -->
+                    <div class="model-card fusion-card" id="fusionCard">
+                        <div class="model-header">
+                            <span class="model-icon">⚡</span>
+                            <div>
+                                <span class="model-name">COMBINED FUSION</span>
+                                <span class="model-arch">Product-of-Experts + Safety OR-Rule</span>
+                            </div>
+                        </div>
+                        <div class="prob-bars" id="fusionBars">
+                            <div class="prob-item">
+                                <div class="prob-top"><span>BIRD</span><span class="prob-pct" id="fusionBird">0%</span></div>
+                                <div class="bar-track"><div class="bar-fill bird" id="fusionBirdBar"></div></div>
+                            </div>
+                            <div class="prob-item">
+                                <div class="prob-top"><span>DRONE</span><span class="prob-pct" id="fusionDrone">0%</span></div>
+                                <div class="bar-track"><div class="bar-fill drone" id="fusionDroneBar"></div></div>
+                            </div>
+                            <div class="prob-item">
+                                <div class="prob-top"><span>OTHER</span><span class="prob-pct" id="fusionOther">0%</span></div>
+                                <div class="bar-track"><div class="bar-fill other" id="fusionOtherBar"></div></div>
+                            </div>
+                        </div>
+                        <div class="model-verdict final" id="fusionVerdict">★ AWAITING TARGET ★</div>
+                    </div>
+                </div>
+
+                <!-- Telemetry Grid -->
+                <div class="telemetry-section" id="telemetrySection">
+                    <div class="telem-title">TARGET MICRO-DOPPLER TELEMETRY</div>
+                    <div class="telem-grid">
+                        <div class="telem-cell">
+                            <span class="t-label">SPEED</span>
+                            <span class="t-value" id="telemSpeed">— m/s</span>
+                        </div>
+                        <div class="telem-cell">
+                            <span class="t-label">VELOCITY</span>
+                            <span class="t-value" id="telemVelocity">— km/h</span>
+                        </div>
+                        <div class="telem-cell">
+                            <span class="t-label">DOPPLER SHIFT</span>
+                            <span class="t-value" id="telemDoppler">— Hz</span>
+                        </div>
+                        <div class="telem-cell">
+                            <span class="t-label">RCS</span>
+                            <span class="t-value" id="telemRCS">— m²</span>
+                        </div>
+                        <div class="telem-cell">
+                            <span class="t-label">ALTITUDE</span>
+                            <span class="t-value" id="telemAlt">— m</span>
+                        </div>
+                        <div class="telem-cell">
+                            <span class="t-label">RANGE</span>
+                            <span class="t-value" id="telemRange">— km</span>
+                        </div>
+                        <div class="telem-cell">
+                            <span class="t-label">HEADING</span>
+                            <span class="t-value" id="telemHeading">— °</span>
+                        </div>
+                        <div class="telem-cell">
+                            <span class="t-label">ROTOR/WING</span>
+                            <span class="t-value" id="telemRotor">— Hz</span>
+                        </div>
+                    </div>
+
+                    <!-- Micro-Doppler Waveform Canvas -->
+                    <div class="waveform-box">
+                        <div class="waveform-label">MICRO-DOPPLER WAVEFORM</div>
+                        <canvas id="waveformCanvas" width="500" height="80"></canvas>
+                    </div>
+                </div>
+
+                <!-- Grad-CAM -->
+                <div class="gradcam-section hidden" id="gradcamSection">
+                    <div class="gradcam-header">
+                        <span>GRAD-CAM ATTRIBUTION</span>
+                        <button id="toggleCamBtn" class="btn btn-sm btn-ghost">SHOW HEATMAP</button>
+                    </div>
+                    <div class="gradcam-images hidden" id="gradcamImages">
+                        <div class="gc-col">
+                            <span>Target Frame</span>
+                            <img id="gcTarget" src="" alt="Target">
+                        </div>
+                        <div class="gc-col">
+                            <span>Grad-CAM Activation</span>
+                            <img id="gcHeatmap" src="" alt="Heatmap">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Inference Stats -->
+                <div class="inference-stats">
+                    <div class="inf-item"><span>INFERENCE</span><span id="infLatency">— ms</span></div>
+                    <div class="inf-item"><span>CONFIDENCE</span><span id="infConf">—</span></div>
+                    <div class="inf-item"><span>OVERRIDE</span><span id="infOverride">INACTIVE</span></div>
+                    <div class="inf-item"><span>TEMP (T)</span><span id="infTemp">—</span></div>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <!-- ============================================ -->
+    <!-- BOTTOM: INCIDENT LOG                         -->
+    <!-- ============================================ -->
+    <footer class="log-panel">
+        <div class="log-title-bar">
+            <h3>REAL-TIME AIR DEFENSE INCIDENT LOG</h3>
+            <div class="log-btns">
+                <button id="exportCsvBtn" class="btn btn-sm btn-outline">EXPORT CSV</button>
+                <button id="clearLogBtn" class="btn btn-sm btn-ghost">CLEAR</button>
+            </div>
+        </div>
+        <div class="log-scroll">
+            <table class="log-table" id="logTable">
+                <thead>
+                    <tr>
+                        <th>TIMESTAMP</th>
+                        <th>TARGET ID</th>
+                        <th>MODE</th>
+                        <th>CNN</th>
+                        <th>RADAR</th>
+                        <th>FUSED</th>
+                        <th>CONFIDENCE</th>
+                        <th>ALERT</th>
+                        <th>LATENCY</th>
+                    </tr>
+                </thead>
+                <tbody id="logBody">
+                    <tr><td colspan="9" class="empty-log">No incidents recorded. System armed and scanning.</td></tr>
+                </tbody>
+            </table>
+        </div>
+    </footer>
+
+    <!-- Alert Overlay (full-screen flash for DRONE) -->
+    <div class="alert-overlay hidden" id="alertOverlay"></div>
+
+    <script src="/static/app.js"></script>
+</body>
+</html>
